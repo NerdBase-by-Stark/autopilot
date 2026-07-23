@@ -23,9 +23,9 @@ With just the above, autopilot runs and its hard stops are enforced **by the pro
 
 ## 2. Recommended — the enforcement layer (what makes it safe to run unattended)
 
-These are **operator-supplied scripts**, referenced throughout the docs as `<gates-dir>/…` and wired as Claude Code hooks in your `settings.json`. This repo does **not** ship them (they're environment-specific), but here is exactly what each must do, so you can implement them — or run without them and rely on the prompt-level stops.
+These **ship in this repo** — `gates/` (5 scripts) and `hooks/` (13 scripts) — and wire in as Claude Code hooks via [`hooks/settings.example.json`](./hooks/settings.example.json). Every box-specific path is a configurable env var with a sane default (`AUTOPILOT_GATES_DIR`, `AUTOPILOT_STATE_DIR`, `AUTOPILOT_DIR`), so you drop them in and point those at wherever you put them. You can also run *without* this layer and rely on the prompt-level stops — but wiring it is what makes the hard stops structural rather than advisory. Here is what each one enforces:
 
-### Gate scripts (a `<gates-dir>/`)
+### Gate scripts (`gates/`)
 
 | Script | Job |
 |---|---|
@@ -35,7 +35,7 @@ These are **operator-supplied scripts**, referenced throughout the docs as `<gat
 | `check-pr-evidence.sh` | Independently **re-derives** the gate evidence on `gh pr create`, so the PR can't be opened on a stale or hand-written pass. |
 | `autopilot-end-of-run-audit.sh` | The **Stop-hook sweep** — an end-of-run isolation + model-watchdog audit (did any write escape the worktree? did a pinned model silently downgrade?). |
 
-### Hooks (PreToolUse / Stop, wired in `settings.json`)
+### Hooks (`hooks/` — PreToolUse / Stop, registered via `settings.example.json`)
 
 Each turns a rule the prompt states into a block the runtime enforces:
 
@@ -62,12 +62,24 @@ A code-review bot on your PRs (e.g. [CodeRabbit](https://coderabbit.ai)) is the 
 2. Install `commands/run-build.md` as a Claude Code slash command.
 3. Set up your tracker's MCP server (Linear, or adapt).
 4. Copy `profiles/example.yml` → `profiles/<your-product>.yml`; fill in the target repo, tracker, branch convention, and gate commands.
-5. *(Recommended)* Implement the gate + hook layer above and wire the hooks in `settings.json`. Without it, autopilot still runs — the hard stops are just prompt-enforced, not structural.
+5. *(Recommended)* Wire the shipped gate + hook layer: put `gates/` + `hooks/` where you want them, set `AUTOPILOT_GATES_DIR` / `AUTOPILOT_STATE_DIR` to match, and register the hooks by merging [`hooks/settings.example.json`](./hooks/settings.example.json) into your Claude Code `settings.json`. Without this, autopilot still runs — the hard stops are just prompt-enforced, not structural.
 6. From anywhere: `/run-build --profile <your-product>`.
 7. In the morning, review the held PR and merge if you're happy.
 
 ---
 
+## 4. Optional add-ons (box-specific — wire up for your environment)
+
+None of these are required, and this repo deliberately does **not** ship them — they're specific to how you operate your box, not to the framework. But if you're standing autopilot up for real (especially if an **agent** is doing the setup), they're worth adding for your environment. The shipped core gives you the seams they attach to.
+
+- **Run observability / metrics** — `gate-log.sh` (shipped) already writes an append-only JSONL of every gate's pass/catch outcome. Point a dashboard or metrics scraper at that file, or swap its sink for your store.
+- **Alerting on run failure** — fire a notification when a run HALTs, holds a not-one-click-mergeable PR, or the end-of-run audit finds something. The author's box uses Alertmanager + a chat webhook; wire whatever you use (Slack / Telegram / PagerDuty / email).
+- **A watchdog sweep** — a periodic job that catches a run that stalled, ran long, or left stray worktrees, and reports or cleans up. Pairs with `autopilot-end-of-run-audit.sh`.
+- **State backup + restore-verify** — the run state under `AUTOPILOT_STATE_DIR` (specs, ledgers, logs, held-PR pointers) is worth backing up; a restore-verify step confirms a backup is actually usable.
+- **Heavy-job capping** — if your gates spawn heavy local work (big test matrices, local model calls), cap them (cgroups / `systemd-run` / your scheduler) so a run can't saturate the box.
+
+Each is a few lines against your own infrastructure. An agent implementing autopilot should treat these as the "make it production-grade for this box" checklist, separate from the framework itself.
+
 ## What autopilot does NOT need
 
-Despite appearing in the author's own environment: an HTTP proxy (`squid`), local model servers (Ollama etc.), monitoring/alerting stacks, secrets brokers, or specific hardware. If you see one of those named anywhere, it's incidental to the author's box — not a dependency of this framework.
+To **run**, autopilot needs nothing beyond §1 (and, for the structural guarantees, §2). It does **not** require an HTTP proxy (`squid`), local model servers (Ollama etc.), or any specific hardware — those are incidental to the author's box. The §4 items are optional operational polish, not dependencies.

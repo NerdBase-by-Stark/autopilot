@@ -94,6 +94,8 @@ Autopilot is the orchestration layer; it runs on a stack you provide. **[`SETUP.
 | `subagent-templates.md` | The briefs for the spawned sub-agents (explorer, architect, implementers, test engineer). |
 | `grumpy-designer.md` | The brief for the adversarial design-review pass. |
 | `profiles/example.yml` | A fully-commented profile template — copy it to configure your own target. |
+| `gates/` | The 5 gate scripts — run sentinel, gate-log, pre-PR gate, evidence re-derive, end-of-run audit. |
+| `hooks/` | The 13 run-scoped hooks that make the hard stops structural, + `settings.example.json` to wire them. |
 
 Per-run state (specs, ledgers, logs) is written under a gitignored `state/` directory and never committed.
 

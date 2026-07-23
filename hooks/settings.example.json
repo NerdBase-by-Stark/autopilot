@@ -1,0 +1,78 @@
+{
+  "_comment": [
+    "REFERENCE Claude Code settings snippet — merge the `hooks` block below into your own",
+    "~/.claude/settings.json (or a project .claude/settings.json). It wires each block-*.sh guard",
+    "to the event + tool matcher it was written for (see the trigger comment at the top of each",
+    "script).",
+    "",
+    "PATHS: the examples assume the hooks live in $HOME/.autopilot/hooks and the gate scripts in",
+    "$HOME/.autopilot/gates (the default AUTOPILOT_GATES_DIR). Adjust the command paths if you put",
+    "them elsewhere; if you relocate the gate scripts, also export AUTOPILOT_GATES_DIR /",
+    "AUTOPILOT_STATE_DIR in the environment the hooks run in so the scripts find their siblings.",
+    "",
+    "EXIT CODES: every block-*.sh exits 2 to BLOCK (surfaces the stderr message to the model) and 0",
+    "to allow. Run-scoped hooks are dormant unless the run-active sentinel is armed for the session.",
+    "",
+    "TRACKER MATCHER: block-task-done-without-evidence.sh is matched to the Linear MCP tool",
+    "`mcp__claude_ai_Linear__save_issue`. Change that matcher to your own tracker's issue-save tool.",
+    "",
+    "END-OF-RUN AUDIT: gates/autopilot-end-of-run-audit.sh is ALSO a Stop-time check, but it takes",
+    "the session transcript path (and repo cwd) as arguments. Wire it via a tiny operator wrapper",
+    "that reads the Stop hook's stdin JSON and forwards `.transcript_path` and `.cwd` to the script;",
+    "that wrapper is environment-specific and intentionally not shipped here."
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-run-merge.sh" },
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-unverified-merge.sh" },
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-run-cloud-ops.sh" },
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-run-commit-secrets.sh" },
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-run-ruleset-mutation.sh" },
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-git-stash-in-run.sh" },
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-large-commits.sh" }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-orchestrator-product-write.sh" }
+        ]
+      },
+      {
+        "matcher": "Agent|Task|Workflow",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-unpinned-spawn.sh" }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-sendmessage-resume-leak.sh" }
+        ]
+      },
+      {
+        "matcher": "mcp__claude_ai_Linear__save_issue",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-task-done-without-evidence.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-complete-without-cr-reconcile.sh" }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.autopilot/hooks/block-subagent-claim-absorption.sh" }
+        ]
+      }
+    ]
+  }
+}
