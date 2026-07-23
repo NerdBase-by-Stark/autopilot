@@ -60,25 +60,26 @@ Autopilot is built to be trusted to run unattended. The guarantees that make tha
 
 ## Quick start
 
-1. Install [Claude Code](https://www.anthropic.com/claude-code).
+1. Install [Claude Code](https://www.anthropic.com/claude-code), and install `commands/run-build.md` as a Claude Code slash command.
 2. Copy `profiles/example.yml` → `profiles/<your-product>.yml` and fill in: your target repo path, your tracker's team/project, your branch convention, and your quality-gate commands (typecheck / lint / test / e2e / migrations).
-3. From your product repo, run the build slash command with your profile:
+3. Wire up the rest of the stack — tracker MCP, and (recommended) the gate + hook layer. **[`SETUP.md`](./SETUP.md) walks through all of it.**
+4. Run the build command with your profile:
    ```
    /run-build --profile <your-product>
    ```
-4. In the morning, open the held PR, read the brief in its body, and merge if you're happy with it.
+5. In the morning, open the held PR, read the brief in its body, and merge if you're happy with it.
 
-The profile is the only project-specific configuration; the framework itself is generic. See `profiles/example.yml` for every field, documented inline.
+The profile is the only project-specific configuration; the framework itself is generic. See `profiles/example.yml` for every field, documented inline, and `SETUP.md` for the supporting stack.
 
 ---
 
-## Requirements
+## What you need to run it
 
-- **Claude Code** (the agent runtime this is built on).
-- A **target git repo** with CI configured (the required checks are what the run watches to green).
-- An **issue tracker** for picking work and recording outcomes (Linear is supported today).
-- Your **quality gates expressed as commands** — whatever "done and correct" means for your codebase.
-- Optionally, a **code-review bot** on your PRs (e.g. CodeRabbit) as the post-PR net.
+Autopilot is the orchestration layer; it runs on a stack you provide. **[`SETUP.md`](./SETUP.md) is the complete map** — every dependency, every gate and hook, and what each one does — so nothing is left to guess. In short:
+
+- **Required:** [Claude Code](https://www.anthropic.com/claude-code) · the `/run-build` command (shipped here as [`commands/run-build.md`](./commands/run-build.md)) · a profile (copy `profiles/example.yml`) · a target repo with CI · an issue tracker with an MCP integration (Linear is what the templates assume) · your quality gates as commands.
+- **Recommended — the safety guarantees:** an operator-supplied **gate + hook layer** that turns the hard stops into structural runtime blocks (no self-merge, no cloud migration, no product-write from the orchestrator seat, no marking work done without evidence, …). `SETUP.md` §2 names each script and exactly what it enforces. Optionally a code-review bot (e.g. [CodeRabbit](https://coderabbit.ai)) as the post-PR net.
+- **Not needed:** an HTTP proxy (`squid`), local model servers, monitoring, or specific hardware — those are incidental to the author's environment, not dependencies of this framework.
 
 ---
 
@@ -86,8 +87,10 @@ The profile is the only project-specific configuration; the framework itself is 
 
 | File | What it is |
 |---|---|
+| [`SETUP.md`](./SETUP.md) | **The full stack map** — every dependency, gate, and hook, and what each enforces. Read this to run it. |
 | `ORCHESTRATOR-V2.md` | The current engine — the prompt the build command executes, phase by phase. |
 | `ORCHESTRATOR.md` | The previous-generation engine, kept for reference. |
+| `commands/run-build.md` | The `/run-build` entry-point command — install as a Claude Code slash command. |
 | `subagent-templates.md` | The briefs for the spawned sub-agents (explorer, architect, implementers, test engineer). |
 | `grumpy-designer.md` | The brief for the adversarial design-review pass. |
 | `profiles/example.yml` | A fully-commented profile template — copy it to configure your own target. |
