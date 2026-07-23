@@ -73,7 +73,7 @@ A code-review bot on your PRs (e.g. [CodeRabbit](https://coderabbit.ai)) is the 
 None of these are required, and this repo deliberately does **not** ship them — they're specific to how you operate your box, not to the framework. But if you're standing autopilot up for real (especially if an **agent** is doing the setup), they're worth adding for your environment. The shipped core gives you the seams they attach to.
 
 - **Run observability / metrics** — `gate-log.sh` (shipped) already writes an append-only JSONL of every gate's pass/catch outcome. Point a dashboard or metrics scraper at that file, or swap its sink for your store.
-- **Alerting on run failure** — fire a notification when a run HALTs, holds a not-one-click-mergeable PR, or the end-of-run audit finds something. The author's box uses Alertmanager + a chat webhook; wire whatever you use (Slack / Telegram / PagerDuty / email).
+- **Alerting on run failure** — fire a notification when a run HALTs, holds a not-one-click-mergeable PR, or the end-of-run audit finds something. Wire whatever your environment uses — Alertmanager + a chat webhook, Slack, PagerDuty, or email.
 - **A watchdog sweep** — a periodic job that catches a run that stalled, ran long, or left stray worktrees, and reports or cleans up. Pairs with `autopilot-end-of-run-audit.sh`.
 - **State backup + restore-verify** — the run state under `AUTOPILOT_STATE_DIR` (specs, ledgers, logs, held-PR pointers) is worth backing up; a restore-verify step confirms a backup is actually usable.
 - **Heavy-job capping** — if your gates spawn heavy local work (big test matrices, local model calls), cap them (cgroups / `systemd-run` / your scheduler) so a run can't saturate the box.
