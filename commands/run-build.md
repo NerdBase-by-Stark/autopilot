@@ -1,5 +1,5 @@
 ---
-argument-hint: [--profile <name>]
+argument-hint: [--profile <name>] [--unit <id1>+<id2> | --ticket <id>]
 description: Run one autopilot iteration against the given profile — pick the next ticket, ship to PR-ready, HOLD for human merge.
 ---
 
@@ -10,6 +10,8 @@ Install this as a Claude Code slash command (e.g. `~/.claude/commands/run-build.
 1. Confirm `<autopilot-dir>/profiles/<name>.yml` exists (where `<autopilot-dir>` is wherever you cloned this repo). If it does not, STOP and report `[run-build] unknown profile: <name> — expected <autopilot-dir>/profiles/<name>.yml`. Do NOT fall back to a different profile and do NOT invent one.
 2. Read that file's `target.repo_path` field.
 3. `cd` to that path (expand `~`) so all relative paths resolve against the correct target repo.
+
+**Operator unit selection (optional).** Also parse `$ARGUMENTS` for `--unit <prefix>-<id1>+<prefix>-<id2>[+…]` (an operator-directed themed bundle → ONE PR) or `--ticket <prefix>-<id>` (one explicit ticket). Whichever is present is honored by the orchestrator's §N2 over its rubric pick (absent → §N2 picks the next unblocked item by rubric).
 
 Then read `<autopilot-dir>/ORCHESTRATOR-V2.md` in full and execute the **RUN-BUILD PROMPT** block (§4 onward) verbatim, with `<name>` as the active profile (phase N0 loads the profile and resolves every `{{profile.<dotted.key>}}` reference from it for the rest of the run). Treat `ORCHESTRATOR-V2.md` as your operating instructions for this iteration.
 
