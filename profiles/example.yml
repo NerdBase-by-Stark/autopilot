@@ -1,0 +1,169 @@
+# profiles/example.yml — autopilot project profile TEMPLATE
+#
+# Copy this file to profiles/<your-product>.yml and fill in every value for
+# your target repo. Launch with `/run-build --profile <your-product>` (v2) or
+# `/run-autopilot --profile <your-product>` (v1).
+#
+# HOW PROFILES ARE READ: there is no template engine. The orchestrator reads
+# this file in full at preflight and holds its values in context, mentally
+# substituting every `{{profile.<dotted.key>}}` token in the orchestrator prompt
+# for the rest of the run. A `{{profile.gates.tsc.cmd}}` reference, for example,
+# resolves to the string at gates.tsc.cmd below.
+#
+# PLACEHOLDER CONVENTION: any value written as `TODO:` (or left as an obvious
+# <placeholder>) is treated as unset — the phase that needs it HALTs and names
+# the missing key rather than guessing, UNLESS that phase documents an explicit
+# degrade-and-continue rule (several do). So it is safe to leave optional fields
+# as TODO until you need them.
+#
+# Every gate/hard-stop command MUST be a literal, runnable, copy-paste command
+# for YOUR stack — the orchestrator runs these verbatim and never improvises one.
+
+schema_version: 1
+profile_name: example                    # must match the filename stem (<name>.yml)
+
+target:
+  repo_path: ~/projects/acme-app         # absolute path to the product repo the orchestrator drives
+  default_git_branch: main               # branch PRs target and worktrees branch off
+
+linear:
+  # The orchestrator tracks work in Linear (with a GitHub-issues fallback if Linear is unreachable).
+  team: TEAM                             # your Linear team key (the short prefix, e.g. the "ENG" in ENG-42)
+  team_id: <team-id>                     # optional: Linear team UUID (leave as placeholder if unused)
+  project: "Acme App"                    # the Linear project name the orchestrator pulls tickets from
+  project_id: <project-id>               # optional: Linear project UUID (leave as placeholder if unused)
+  ticket_id_prefix: TEAM                 # ticket IDs look like TEAM-<id>
+  branch_convention: "TEAM-<id>-<short-kebab-desc>"   # kebab slug from the ticket's branch name, trimmed
+  branch_regex: "^TEAM-[0-9]+-"          # filters `gh pr list` down to the orchestrator's own PRs
+  done_requires_evidence: false          # true if your Linear "Done" transition requires PR/deploy evidence
+
+memory:
+  # Optional: a directory of accumulated project gotchas the orchestrator reads each session.
+  # (Claude Code project-scoped memory. Leave as placeholders if you keep none.)
+  target_memory_dir: "<memory-dir>/"     # e.g. a per-project memory folder; read at session start
+  target_memory_index: "<memory-dir>/MEMORY.md"   # index file; individual gotchas are lazy-loaded
+  # note: absent index = no seeded gotchas (not an error). Seed one as gotchas accumulate.
+
+artifacts:
+  # Docs + templates the orchestrator reads. Keep them EITHER in the product repo (repo-relative
+  # paths like `artifacts/…`) OR alongside this profile (absolute paths that resolve from any cwd).
+  # Only pr_template is strictly required by the v2 engine; the rest support v1's richer flow.
+  dir: artifacts/
+  mission_doc: artifacts/00-MISSION.md
+  migration_rules_doc: artifacts/04-migration-rules.md
+  pr_template: artifacts/05-pr-template.md            # PR-body shape the engine fills in at PR time
+  linear_mapping_doc: artifacts/06-linear-mapping.md  # Linear <-> PR <-> branch table (v1 work-source fallback)
+  agent_handoff_protocol: artifacts/09-agent-handoff-protocol.md
+  running_log: artifacts/RUNNING-LOG.md
+  spec_file_template: "artifacts/05-pr<N>-<short>-spec.md"      # <N>/<short> are runtime-filled
+  context_file_template: "artifacts/05-pr<N>-<short>-context.md"
+  screenshots_dir_template: "artifacts/pr<N>-screenshots/"
+
+design:
+  # How the orchestrator judges UI fidelity. Point at YOUR design source of truth — a token/CSS
+  # system, a mockup file, a component library — whatever binds the look. Leave blank for non-UI targets.
+  design_source_glob: "src/styles/*.css"   # glob for your design tokens / authoritative style files
+  css_authoritative_paths: []              # optional: specific files the CSS-class audit greps against
+  css_class_prefix: ""                     # optional: your project's class prefix (e.g. "be-"); "" disables the audit
+
+# Surfaces that FORCE the HIGH risk tier (which runs the deep pre-PR review gate) and forbid the
+# trivial-scope skip. List whatever is security- or money-sensitive in YOUR product. Any diff touching
+# migrations, auth, or RLS is treated HIGH; add your own path/keyword/label triggers here.
+sensitive_surfaces:
+  money_keywords: []                       # e.g. pricing/ledger/payment field names (omit if no commerce surface)
+  money_auth_entities: []                  # server actions / tables treated as HIGH by default
+  security_entities:                       # non-money sensitive surfaces (auth, RLS, PII, admin)
+    - "supabase/migrations/**"
+    - "RLS policies (every table)"
+    - "auth / invite / signup flows"
+    - "role enforcement"
+  risk_tier_high_path_patterns:            # any touched path matching these -> HIGH tier
+    - "supabase/migrations/**"
+    - "src/**/*auth*.{ts,tsx}"
+    - "src/**/*rls*.{ts,tsx}"
+    - "src/**/*payment*.{ts,tsx}"
+  risk_tier_high_linear_labels:            # any ticket label matching these -> HIGH tier
+    - security
+    - "database AND path-pattern match"
+
+# Quality gates — the checks every PR must clear. Each cmd MUST be literal and runnable for your stack.
+# `<N>` / `<touched-paths>` are runtime-filled parameters, not missing commands. Swap these examples
+# (Node/TypeScript/Supabase/Playwright) for whatever your project actually uses.
+gates:
+  tsc:
+    cmd: "npx tsc -p tsconfig.json --noEmit"
+    pass_criterion: "exit 0"
+  eslint:
+    cmd: "npx eslint src/<touched-paths>"
+    pass_criterion: "exit 0, 0 warnings on touched files"
+  lint_migrations:
+    cmd: "bash scripts/lint-migrations.sh"        # your additive-only migration linter (omit if no DB)
+    pass_criterion: "exit 0"
+  migration_up_local:
+    cmd: "npx supabase migration up --local"      # apply migrations to a LOCAL db only
+    pass_criterion: "exit 0"
+  types_regen:
+    cmd: "npx supabase gen types typescript --local > src/types/database.ts"
+    pass_criterion: "tsc still exit 0 after any convenience-block re-append"
+  playwright:
+    cmd: "npx playwright test e2e/pr<N>-verify*.spec.ts"
+    pass_criterion: "100% pass against seeded local data"
+  screenshots_count:
+    cmd: "ls artifacts/pr<N>-screenshots/*.png 2>/dev/null | wc -l"
+    pass_criterion: ">= 3"
+  screenshots_png_truth:
+    cmd: "file artifacts/pr<N>-screenshots/*.png | grep -c 'PNG image data'"
+    pass_criterion: ">= 3, and must equal screenshots_count (guards against text files renamed .png)"
+  pre_pr_gate:
+    cmd: "bash <gates-dir>/pre-pr-gate.sh"        # your operator-provided pre-PR gate runner (see note)
+    pass_criterion: "exit 0 — runs the repo's own .gates.conf suite (rederive + lint + typecheck + AI review)"
+    note: >-
+      The pre-PR gate suite and the hooks it re-derives are operator-provided infrastructure that lives
+      OUTSIDE this framework repo. Wire your own (or drop this gate) — the orchestrator only invokes the
+      command named here. It is intentionally not shipped in the public framework.
+  coderabbit:
+    cmd: "timeout 300 coderabbit review --agent --type committed --base main"
+    pass_criterion: "structured findings triaged into C/H/M/L; skip-with-WARN only if `coderabbit doctor` shows unauthenticated/uninstalled"
+    note: >-
+      Optional AI code-review pass on the verified COMMITTED diff. Runs at most ONCE per PR run (the
+      premium reviewer). Any GitHub-App review on the ready-flip is a separate, non-CLI surface.
+
+# Required CI status checks on your default branch. The engine (E6/E6.5) + the completion gate evaluate
+# the LATEST run per required-check NAME. Fill these in from your branch-protection / ruleset config.
+ci:
+  workflow_file: ".github/workflows/ci.yml"
+  required_checks:                         # the exact check NAMES your branch protection requires
+    - ci
+  draft_skipped_checks: []                 # checks that report "skipped" on drafts and only fire on ready_for_review
+  ready_for_review_fires_spine: true       # true if flipping draft->ready fires your full required CI
+  mark_ready_auth: >-
+    Use your box `gh` PAT to `gh pr ready` — NEVER from inside GitHub Actions with GITHUB_TOKEN
+    (GitHub suppresses the triggered run, the required check stays "skipped", and the PR becomes
+    mergeable UNGATED).
+
+hard_stops:
+  # Commands the orchestrator must NEVER auto-run. It HALTs and hands these to a human.
+  cloud_migration_wrapper_cmd: "bash scripts/safe-migrate.sh"   # your cloud-migration wrapper, if any
+  cloud_migration_linked_cmd: "npx supabase db push --linked"   # the actual cloud-linked push
+  # Add any project-specific boundaries (deploys, DNS, publishing real user data, etc.):
+  # deploy_cmd: "wrangler pages deploy"
+  # dns_zone: "NEVER touch DNS/zone records"
+  # pii_publish: "NEVER let real user data reach a published artifact; PII-sweep before any deploy"
+
+deploy_check:
+  # Optional: a live URL used only by a Linear "Done"-transition evidence hook, if you have one.
+  done_hook_probe_url: "https://acme-app.example.com/login"
+
+pr:
+  # NO Co-Authored-By / attribution trailer is added to commits (this is enforced by settings, not here).
+  # The PR-body template the engine fills in is profile.artifacts.pr_template above.
+
+stack_gotchas:
+  # Free-form list of YOUR stack's binding gotchas. The orchestrator surfaces these to implementers so
+  # they don't relearn them each run. Replace these examples with your own hard-won rules.
+  - "example: single db client per server action — don't create two"
+  - "example: generated types strip hand-added convenience aliases — re-append after regen"
+  - "example: CSS-Grid table cells render in DOM order, not header order — match grid-template-columns"
+  - "example: every dialog needs focus-trap + body-scroll-lock + state-reset on re-open"
+  - "example: recompute money server-side — never trust client-submitted totals"
+  - "example: migrations are additive-only; RLS on every table, deny-by-default"

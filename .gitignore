@@ -1,0 +1,36 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs
+*.log
+
+# Claude Code local
+.claude/settings.local.json
+.claude/logs/
+
+# Overnight tweak/test runtime state (untracked)
+.tweak-state.json
+.tweak-overnight.log
+.tweak-stop
+.tweak-blocked.md
+
+# Overnight-batch runtime state (untracked)
+.overnight-state.json
+.overnight-blocked.md
+.overnight-stop
+
+# Per-run / per-night orchestrator state (never commit — may hold ticket bodies,
+# specs, PR numbers, and other target-specific runtime data)
+state/
+
+# Local secrets / env — never commit
+.env
+.env.local
+*.pem
